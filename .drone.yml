@@ -1,0 +1,81 @@
+kind: pipeline
+name: default
+type: docker
+
+steps:
+  - name: build-and-publish
+    image: plugins/docker
+    settings:
+      repo: kafka-to-rabbit
+      ## done run only and see error
+      tags:
+        - v1.0.0
+      registry: harbor.sgdctroy.net
+      username:
+        from_secret:  harbor_user
+      password:
+        from_secret: harbor_ldap_password
+      config:
+        from_secret: docker_credentials
+      dockerfile: Dockerfile
+      insecure: true
+  - name: Deploy to dev
+    image: sinlead/drone-kubectl
+    settings:
+      kubernetes_server: https://rancher.sgdctroy.net/k8s/clusters/c-fhgts
+      kubernetes_cert: 
+        from_secret: kube_dev_ca
+      kubernetes_token:
+        from_secret: kubernetes_token
+    commands:
+      - kubectl apply -n socialgist-dev -f deployment_inbound.dev.yaml
+    when:
+      branch:
+        - k8s-dev
+      event:
+        - push
+        
+  - name: build-and-publish-prod
+    image: plugins/docker
+    settings:
+      repo:  kafka-to-rabbit
+        tags:
+        - v1.0.0
+      registry: harbor.sgdctroy.net
+      username:
+        from_secret:  harbor_prod_user
+      password:
+        from_secret: harbor_prod_password
+      config:
+        from_secret: docker_credentials
+      dockerfile: Dockerfile
+      insecure: true
+    when:
+      branch:
+        - k8s-prod
+      event:
+        - push
+  - name: Deploy to Prod
+    image: sinlead/drone-kubectl
+    settings:
+      kubernetes_server: https://rancher.sgdctroy.net/k8s/clusters/c-wq4mh
+      kubernetes_cert: 
+        from_secret: k8s-prod-ca
+      kubernetes_token:
+        from_secret: kubernetes_token
+    commands:
+      - kubectl apply -n sg-kafka2influx -f deployment_sys.yaml
+    when:
+      branch:
+        - k8s-prod
+      event:
+        - push
+trigger:
+  branch:
+    - k8s-dev
+    - k8s-prod
+  event:
+    - push
+    - pull-request
+image_pull_secrets:
+  - docker_credentials
