@@ -64,7 +64,7 @@ steps:
       kubernetes_token:
         from_secret: kubernetes_token
     commands:
-      - kubectl apply -n sg-kafka2influx -f deployment_sys.yaml
+      - kubectl apply -n socialgist-dev -f deployment_sys.yaml
     when:
       branch:
         - k8s-prod
